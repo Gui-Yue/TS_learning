@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    /* --- 基础环境配置 --- */
+    // 目标代码版本：Node 24 支持最新的 ES2022/ES2023 特性，
+    // 所以我们不需要把代码“降级”编译成旧的 ES5/ES6，保持原生语法即可。
+    "target": "ES2022",
+    
+    // 模块系统：告诉 TS 我们在用 Node.js 的现代模块标准
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    
+    /* --- 严格模式 --- */
+    "strict": true,  
+    // 开启 strict 等于同时开启了：
+    // - noImplicitAny: true (禁止隐式 any，类似 Python 强制类型标注)
+    // - strictNullChecks: true (变量默认不能是 null/undefined，类似 Go 的指针检查)
+
+    /* --- 输出配置 --- */
+    "outDir": "./dist",       // 编译后的 .js 文件放哪里
+    "sourceMap": true,        // 生成映射文件，方便断点调试
+    
+    /* --- 互操作性 --- */
+    "esModuleInterop": true,  // 允许 import x from 'commonjs-lib'
+    "skipLibCheck": true,     // 跳过依赖库的类型检查 (为了编译速度)
+    "forceConsistentCasingInFileNames": true // 强制文件名大小写一致 (Linux下很重要)
+  },
+  "include": ["src/**/*"]     // 只编译 src 目录下的文件
+}
