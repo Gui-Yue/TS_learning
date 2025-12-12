@@ -7,8 +7,7 @@
     *   *对标*：类似 Go 的 **Gin** 或 Python 的 **FastAPI** (高性能、轻量级)。
 3.  **ORM 与数据库 (Prisma + PostgreSQL)**：设计数据模型并连接数据库。
     *   *对标*：Prisma 是目前 Node 界的 GORM/SQLAlchemy，但它是 **Schema First** 的（先写 schema 文件，自动生成类型安全的 Client）。
-4.  **运行时校验 (Zod)**：实现 API 入参校验。
-    *   *对标*：类似 Python 的 **Pydantic**。
+
 
 ### 创建标准化项目，并搭建脚手架
 ```bash

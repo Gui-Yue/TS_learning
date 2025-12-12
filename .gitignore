@@ -1,0 +1,41 @@
+# --- 1. 依赖包 (重中之重，绝对不要提交) ---
+node_modules/
+.pnpm-store/
+
+# --- 2. 编译产物 (由代码生成的文件) ---
+dist/
+build/
+out/
+coverage/
+*.tsbuildinfo
+
+# --- 3. 环境变量 (包含密码，绝对不要提交！) ---
+.env
+.env.local
+.env.*.local
+# 但是保留 .env.example (用于告诉别人需要配什么变量)
+
+# --- 4. Next.js 缓存与构建文件 ---
+.next/
+next-env.d.ts
+
+# --- 5. 系统文件 ---
+.DS_Store
+Thumbs.db
+
+# --- 6. 编辑器配置 (可选，看团队习惯) ---
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/settings.json
+.idea/
+
+# --- 7. 日志文件 ---
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# --- 8. Prisma ---
+# 如果用 SQLite，排除本地数据库文件
+*.db
+*.db-journal
