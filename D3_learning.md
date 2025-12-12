@@ -153,4 +153,162 @@ $ npx tsx ./src/test-zod.ts
   tags: [ 'Coder', 'Gamer' ]
 }
 ```
+### 构建类型安全的CRUD API
+在本阶段我们要把“Zod 的校验能力”和“Prisma 的数据库能力”结合到 Fastify 服务器里。
+先完成两个准备工作：”安装插件“&”封装数据库连接“
+#### 安装Fastify的Zod适配器
+我们需要一个“胶水”库，让 Fastify 能直接读懂 Zod 的 Schema，并自动生成 Swagger 文档。
+```bash
+# 在apps/api目录下
+$ pnpm add fastify-type-provider-zod
+```
+#### 封装Prisma 单例 
+在 Web 开发中，最忌讳的就是“每次请求都 new 一个数据库连接”。这会迅速耗尽数据库的连接池。
+我们需要把昨天 test-db.ts 里写的连接逻辑提取出来，变成一个全局共享的模块。
+```bash
+$ mkdir -p src/lib && touch src/lib/db.ts
+```
+在src/lib/db.ts中写入：
+```ts
+// apps/api/src/lib/db.ts
+import 'dotenv/config';
+import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { Pool } from 'pg';
 
+// 1. 创建 Postgres 连接池
+const connectionString = process.env.DATABASE_URL!;
+const pool = new Pool({ connectionString });
+const adapter = new PrismaPg(pool);
+
+// 2. 挂载到全局变量 (防止开发环境热重启导致连接泄露)
+// 这是一个标准的 TypeScript 单例模式写法
+const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
+
+// 3. 如果已有实例就复用，没有就新建
+export const prisma = globalForPrisma.prisma || new PrismaClient({ adapter });
+
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+```
+
+### 编写业务路由（CRUD）
+可以将路由逻辑单独放在一个文件中。
+```bash
+$ mkdir -p src/routes && touch src/routes/prompts.ts
+```
+在文件中写入：
+```ts
+// apps/api/src/routes/prompts.ts
+import { FastifyInstance } from 'fastify';
+import { ZodTypeProvider } from 'fastify-type-provider-zod';
+import { z } from 'zod';
+import { prisma } from '../lib/db'; // 导入刚才封装的单例
+
+export async function promptRoutes(app: FastifyInstance) {
+  // 关键动作：让这个 Fastify 实例“变身”，拥有 Zod 的类型推导能力
+  const server = app.withTypeProvider<ZodTypeProvider>();
+
+  // --- 1. POST /prompts (新增) ---
+  server.post(
+    '/prompts',
+    {
+      schema: {
+        // 定义 Body 的校验规则 (Zod Schema)
+        body: z.object({
+          title: z.string().min(1, "标题不能为空"),
+          content: z.string().min(1, "内容不能为空"),
+          tags: z.array(z.string()).optional(), // 可选的标签数组
+        }),
+      },
+    },
+    async (request, reply) => {
+      // ✨ 见证奇迹 ✨
+      // 把鼠标悬停在下面的 title, content 上
+      // 编辑器知道它们是 string，绝对不可能是 undefined 或 number
+      const { title, content, tags } = request.body;
+
+      try {
+        const newPrompt = await prisma.prompt.create({
+          data: {
+            title,
+            content,
+            tags: tags ?? [], // 如果 tags 是 undefined，给个默认空数组
+            userId: 1,        // 暂时硬编码为 ID=1 (Day 2 创建的那个用户)
+          },
+        });
+        
+        // 返回 201 Created
+        return reply.status(201).send(newPrompt);
+      } catch (error) {
+        request.log.error(error);
+        return reply.status(500).send({ error: '创建失败' });
+      }
+    }
+  );
+
+  // --- 2. GET /prompts (查询列表) ---
+  server.get('/prompts', async (request, reply) => {
+    const prompts = await prisma.prompt.findMany({
+      orderBy: { createdAt: 'desc' }, // 按时间倒序
+      take: 50,                       // 最多取 50 条
+      include: { 
+        // 联表查询：顺便把作者的邮箱查出来
+        user: { 
+          select: { email: true, role: true } 
+        } 
+      }
+    });
+    return prompts;
+  });
+}
+```
+#### 在入口处注册路由
+修改src/index.ts,将Zod的编译器和刚写的路由挂载上去：
+新的api/src/index.ts文件如下：
+```ts
+// apps/api/src/index.ts
+import Fastify from 'fastify';
+import { serializerCompiler, validatorCompiler } from 'fastify-type-provider-zod';
+import { promptRoutes } from './routes/prompts'; // 导入刚才写的路由
+
+const server = Fastify({ logger: true });
+
+// 1. 配置 Zod 编译器 (必须配置，否则 Fastify 不认识 Zod Schema)
+server.setValidatorCompiler(validatorCompiler);
+server.setSerializerCompiler(serializerCompiler);
+
+// 2. 注册业务路由
+server.register(promptRoutes);
+
+// 3. 启动服务
+const start = async () => {
+  try {
+    await server.listen({ port: 3001, host: '0.0.0.0' });
+    console.log('Server running at http://localhost:3001');
+  } catch (err) {
+    server.log.error(err);
+    process.exit(1);
+  }
+};
+
+start();
+```
+#### 启动服务并测试
+```bash
+$ pnpm dev
+
+# 在另一个终端测试api是否正确响应
+$ curl -X POST http://localhost:3001/prompts \
+  -H "Content-Type: application/json" \
+  -d '{"title": "", "content": "test"}'
+
+  # 会报错400，因为空标题
+
+$ curl -X POST http://localhost:3001/prompts \
+  -H "Content-Type: application/json" \
+  -d '{"title": "API Test", "content": "Hello from Curl", "tags": ["api"]}'
+  # 返回新创建的 prompt JSON
+
+$ curl http://localhost:3001/prompts
+  # 返回包含刚才那条数据的数组。
+```

@@ -9,7 +9,7 @@ out/
 coverage/
 *.tsbuildinfo
 
-# --- 3. 环境变量 (包含密码，绝对不要提交！) ---
+# --- 3. 环境变量 (包含密码，不能提交！) ---
 .env
 .env.local
 .env.*.local
@@ -23,7 +23,7 @@ next-env.d.ts
 .DS_Store
 Thumbs.db
 
-# --- 6. 编辑器配置 (可选，看团队习惯) ---
+# --- 6. 编辑器配置 (可选) ---
 .vscode/*
 !.vscode/extensions.json
 !.vscode/launch.json
